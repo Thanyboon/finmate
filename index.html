@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="th" class="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>FinMate - วางแผนการเงิน & หารบิล</title>
+  
+  <!-- PWA & iOS Home Screen Meta -->
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#10B981" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FinMate" />
+  <link rel="apple-touch-icon" href="./icon.svg" />
+  <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+
+  <!-- Fonts & Tailwind CSS -->
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Prompt', 'sans-serif'] },
+          colors: { primary: '#10B981', secondary: '#059669' }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { -webkit-tap-highlight-color: transparent; padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .tab-content { display: none; animation: fadeIn 0.2s ease-in-out; }
+    .tab-content.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 dark:bg-slate-950 dark:text-slate-100 min-h-screen flex flex-col md:flex-row transition-colors duration-200">
+
+  <!-- Sidebar สำหรับ iPad / จอใหญ่ -->
+  <aside class="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-5 z-30">
+    <div class="flex items-center gap-3 mb-8">
+      <img src="./icon.svg" class="w-10 h-10 rounded-xl shadow" alt="Logo" />
+      <div>
+        <h1 class="font-bold text-xl text-emerald-600 dark:text-emerald-400">FinMate</h1>
+        <p class="text-xs text-slate-400">Smart Finance & Split</p>
+      </div>
+    </div>
+    <nav class="flex-1 space-y-2" id="desktop-nav">
+      <button onclick="switchTab('dashboard')" data-tab="dashboard" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-left bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">📊 แดชบอร์ด</button>
+      <button onclick="switchTab('transactions')" data-tab="transactions" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-left text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">💸 รายรับ-รายจ่าย</button>
+      <button onclick="switchTab('splits')" data-tab="splits" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-left text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">🧾 หารบิลกับเพื่อน</button>
+      <button onclick="switchTab('goals')" data-tab="goals" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-left text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">🎯 ออมเงิน & งบประมาณ</button>
+      <button onclick="switchTab('settings')" data-tab="settings" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-left text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">🏦 เช็กยอด & ตั้งค่า</button>
+    </nav>
+    <div class="pt-4 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between">
+      <button onclick="toggleDarkMode()" class="text-sm px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-800">🌓 ธีม</button>
+      <button onclick="syncData(true)" class="text-sm px-3 py-2 rounded-lg bg-emerald-500 text-white font-medium">🔄 ซิงค์</button>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 md:pl-64 pb-24 md:pb-8">
+    <!-- Top Header สำหรับมือถือ / Status Bar -->
+    <header class="sticky top-0 z-20 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-2 md:hidden">
+        <img src="./icon.svg" class="w-8 h-8 rounded-lg" alt="Logo" />
+        <span class="font-bold text-lg text-emerald-600 dark:text-emerald-400">FinMate</span>
+      </div>
+      <div class="hidden md:block font-semibold text-lg" id="page-title">แดชบอร์ดภาพรวม</div>
+      <div class="flex items-center gap-2">
+        <span id="sync-status" class="text-xs px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500">พร้อมใช้งาน</span>
+        <button onclick="toggleDarkMode()" class="md:hidden p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-sm">🌓</button>
+        <button onclick="syncData(true)" class="md:hidden p-2 rounded-lg bg-emerald-500 text-white text-sm">🔄</button>
+      </div>
+    </header>
+
+    <div class="max-w-5xl mx-auto p-4 md:p-6 space-y-6">
+
+      <!-- ==================== TAB 1: DASHBOARD ==================== -->
+      <section id="tab-dashboard" class="tab-content active space-y-6">
+        <!-- ยอดเงินรวม & กระเป๋าเงิน -->
+        <div class="bg-gradient-to-br from-emerald-500 to-teal-700 rounded-3xl p-6 text-white shadow-lg">
+          <p class="text-emerald-100 text-sm">ยอดเงินคงเหลือสุทธิทั้งหมด</p>
+          <h2 class="text-3xl md:text-4xl font-bold mt-1" id="total-balance">฿0.00</h2>
+          <div class="grid grid-cols-2 gap-4 mt-6 pt-4 border-t border-white/20">
+            <div>
+              <p class="text-xs text-emerald-100">รายรับเดือนนี้</p>
+              <p class="text-lg font-semibold text-white" id="month-income">+฿0</p>
+            </div>
+            <div>
+              <p class="text-xs text-emerald-100">รายจ่ายเดือนนี้</p>
+              <p class="text-lg font-semibold text-rose-200" id="month-expense">-฿0</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- รายการกระเป๋าเงิน (Horizontal Scroll) -->
+        <div>
+          <div class="flex justify-between items-center mb-3">
+            <h3 class="font-semibold text-base">กระเป๋าเงิน & บัญชี</h3>
+            <button onclick="openModal('modal-wallet')" class="text-xs text-emerald-600 dark:text-emerald-400 font-medium">+ เพิ่มกระเป๋า</button>
+          </div>
+          <div id="wallets-container" class="flex gap-3 overflow-x-auto no-scrollbar pb-1"></div>
+        </div>
+
+        <!-- กราฟ & สรุปหมวดหมู่ -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <h3 class="font-semibold mb-4">สัดส่วนรายจ่ายเดือนนี้</h3>
+            <div class="h-56 flex items-center justify-center">
+              <canvas id="expenseChart"></canvas>
+            </div>
+          </div>
+          <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <h3 class="font-semibold mb-4">สถานะงบประมาณรายเดือน</h3>
+            <div id="dashboard-budgets" class="space-y-3 text-sm"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 2: TRANSACTIONS ==================== -->
+      <section id="tab-transactions" class="tab-content space-y-4">
+        <div class="flex flex-wrap gap-2 justify-between items-center">
+          <h2 class="font-bold text-xl">ประวัติรายรับ-รายจ่าย</h2>
+          <button onclick="openModal('modal-tx')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-medium shadow">+ บันทึกรายการ</button>
+        </div>
+
+        <!-- ค้นหาและกรอง -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <input type="text" id="filter-search" oninput="renderTransactions()" placeholder="🔍 ค้นหาหมายเหตุ..." class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm outline-none" />
+          <select id="filter-category" onchange="renderTransactions()" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm outline-none">
+            <option value="">ทุกหมวดหมู่</option>
+          </select>
+          <input type="month" id="filter-month" onchange="renderTransactions()" class="px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm outline-none" />
+        </div>
+
+        <div id="tx-list" class="space-y-2.5"></div>
+      </section>
+
+      <!-- ==================== TAB 3: SPLIT BILL ==================== -->
+      <section id="tab-splits" class="tab-content space-y-4">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="font-bold text-xl">หารบิลกับเพื่อน</h2>
+            <p class="text-xs text-slate-400">คำนวณค่าอาหาร ค่าทริป และติดตามคนโอนคืน</p>
+          </div>
+          <button onclick="openModal('modal-split')" class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-medium shadow">+ สร้างบิลหาร</button>
+        </div>
+        <div id="split-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </section>
+
+      <!-- ==================== TAB 4: GOALS & BUDGETS ==================== -->
+      <section id="tab-goals" class="tab-content space-y-6">
+        <!-- เป้าหมายออมเงิน -->
+        <div>
+          <div class="flex justify-between items-center mb-3">
+            <h2 class="font-bold text-xl">🎯 เป้าหมายการออมเงิน</h2>
+            <button onclick="openModal('modal-goal')" class="bg-emerald-500 text-white px-3.5 py-1.5 rounded-xl text-sm font-medium">+ ตั้งเป้าหมาย</button>
+          </div>
+          <div id="goals-list" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+        </div>
+
+        <!-- ตั้งงบประมาณรายเดือน -->
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800">
+          <h3 class="font-bold text-lg mb-3">📊 ตั้งงบประมาณรายเดือนตามหมวดหมู่</h3>
+          <form onsubmit="handleSaveBudget(event)" class="flex flex-wrap gap-3 mb-4">
+            <select id="budget-category" class="flex-1 min-w-[140px] px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm"></select>
+            <input type="number" id="budget-limit" placeholder="วงเงิน (บาท)" required class="w-36 px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm" />
+            <button type="submit" class="bg-slate-800 dark:bg-emerald-600 text-white px-4 py-2 rounded-xl text-sm font-medium">บันทึกงบ</button>
+          </form>
+          <div id="budgets-list" class="space-y-3"></div>
+        </div>
+      </section>
+
+      <!-- ==================== TAB 5: RECONCILE & SETTINGS ==================== -->
+      <section id="tab-settings" class="tab-content space-y-6">
+        <!-- ระบบตรวจสอบยอดเงินธนาคาร -->
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-4">
+          <div>
+            <h2 class="font-bold text-lg text-emerald-600 dark:text-emerald-400">🏦 ตรวจสอบยอดเงินธนาคาร (Reconcile)</h2>
+            <p class="text-xs text-slate-400">เช็กว่ายอดเงินจริงในแอปธนาคารตรงกับที่บันทึกในระบบหรือไม่</p>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="text-xs text-slate-500">เลือกบัญชี / กระเป๋าเงิน</label>
+              <select id="rec-wallet" onchange="calculateReconcile()" class="w-full mt-1 px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm"></select>
+            </div>
+            <div>
+              <label class="text-xs text-slate-500">ยอดเงินจริงในแอปธนาคารตอนนี้ (บาท)</label>
+              <input type="number" step="0.01" id="rec-actual" oninput="calculateReconcile()" placeholder="0.00" class="w-full mt-1 px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm" />
+            </div>
+          </div>
+          <div id="rec-result" class="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 hidden"></div>
+        </div>
+
+        <!-- การเชื่อมต่อ Google Sheets -->
+        <div class="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+          <h2 class="font-bold text-lg">🔗 เชื่อมต่อ Google Apps Script URL</h2>
+          <p class="text-xs text-slate-400">นำ Web App URL ที่ได้จากการ Deploy ใน Google Apps Script มาวางที่นี่เพื่อซิงค์ข้อมูลข้ามอุปกรณ์</p>
+          <input type="url" id="gas-url-input" placeholder="https://script.google.com/macros/s/..." class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm" />
+          <div class="flex gap-2">
+            <button onclick="saveGasUrl()" class="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-medium">บันทึกการเชื่อมต่อ</button>
+            <button onclick="exportBackupJson()" class="bg-slate-200 dark:bg-slate-800 px-4 py-2 rounded-xl text-sm">สำรองข้อมูล JSON</button>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Floating Add Button สำหรับมือถือ -->
+  <button onclick="openModal('modal-tx')" class="md:hidden fixed right-4 bottom-20 z-30 w-14 h-14 rounded-full bg-emerald-500 text-white text-2xl shadow-lg flex items-center justify-center active:scale-95 transition">+</button>
+
+  <!-- Bottom Navigation สำหรับมือถือ -->
+  <nav class="md:hidden fixed bottom-0 inset-x-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-around py-2 z-30 text-[11px]">
+    <button onclick="switchTab('dashboard')" data-tab="dashboard" class="mob-nav-btn flex flex-col items-center text-emerald-600 font-semibold"><span class="text-lg">📊</span>ภาพรวม</button>
+    <button onclick="switchTab('transactions')" data-tab="transactions" class="mob-nav-btn flex flex-col items-center text-slate-400"><span class="text-lg">💸</span>รายการ</button>
+    <button onclick="switchTab('splits')" data-tab="splits" class="mob-nav-btn flex flex-col items-center text-slate-400"><span class="text-lg">🧾</span>หารบิล</button>
+    <button onclick="switchTab('goals')" data-tab="goals" class="mob-nav-btn flex flex-col items-center text-slate-400"><span class="text-lg">🎯</span>ออมเงิน</button>
+    <button onclick="switchTab('settings')" data-tab="settings" class="mob-nav-btn flex flex-col items-center text-slate-400"><span class="text-lg">🏦</span>เช็กยอด</button>
+  </nav>
+
+  <!-- ==================== MODALS ==================== -->
+  <!-- Modal: บันทึกรายรับ-รายจ่าย -->
+  <div id="modal-tx" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-lg">บันทึกรายการใหม่</h3>
+        <button onclick="closeModal('modal-tx')" class="text-slate-400 text-xl">&times;</button>
+      </div>
+      <form onsubmit="handleAddTransaction(event)" class="space-y-3">
+        <div class="grid grid-cols-2 gap-2 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+          <label class="cursor-pointer text-center">
+            <input type="radio" name="tx-type" value="expense" checked class="hidden peer" onchange="updateCategoryOptions()" />
+            <div class="py-2 rounded-lg peer-checked:bg-rose-500 peer-checked:text-white font-medium text-sm">รายจ่าย</div>
+          </label>
+          <label class="cursor-pointer text-center">
+            <input type="radio" name="tx-type" value="income" class="hidden peer" onchange="updateCategoryOptions()" />
+            <div class="py-2 rounded-lg peer-checked:bg-emerald-500 peer-checked:text-white font-medium text-sm">รายรับ</div>
+          </label>
+        </div>
+        <input type="number" step="0.01" id="tx-amount" placeholder="จำนวนเงิน (บาท)" required class="w-full px-4 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-xl font-bold outline-none" />
+        <div class="grid grid-cols-2 gap-3">
+          <select id="tx-category" class="px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm"></select>
+          <select id="tx-wallet" class="px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm"></select>
+        </div>
+        <input type="date" id="tx-date" required class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm" />
+        <input type="text" id="tx-note" placeholder="หมายเหตุ (เช่น ข้าวมันไก่, ค่ารถ)" class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm" />
+        <button type="submit" class="w-full py-3 rounded-xl bg-emerald-500 text-white font-semibold">บันทึกรายการ</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: เพิ่มกระเป๋าเงิน -->
+  <div id="modal-wallet" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-lg">เพิ่มกระเป๋าเงิน / บัญชี</h3>
+        <button onclick="closeModal('modal-wallet')" class="text-slate-400 text-xl">&times;</button>
+      </div>
+      <form onsubmit="handleAddWallet(event)" class="space-y-3">
+        <input type="text" id="w-name" placeholder="ชื่อบัญชี (เช่น กสิกร, ทรูมันนี่)" required class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm" />
+        <input type="number" step="0.01" id="w-balance" placeholder="ยอดเงินเริ่มต้น (บาท)" required class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm" />
+        <select id="w-color" class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm">
+          <option value="#10B981">สีเขียวมรกต</option>
+          <option value="#3B82F6">สีน้ำเงิน</option>
+          <option value="#8B5CF6">สีม่วง</option>
+          <option value="#F59E0B">สีส้ม</option>
+        </select>
+        <button type="submit" class="w-full py-3 rounded-xl bg-emerald-500 text-white font-semibold">สร้างกระเป๋าเงิน</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: สร้างบิลหารกับเพื่อน -->
+  <div id="modal-split" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-lg">สร้างบิลหารกับเพื่อน</h3>
+        <button onclick="closeModal('modal-split')" class="text-slate-400 text-xl">&times;</button>
+      </div>
+      <form onsubmit="handleAddSplit(event)" class="space-y-3">
+        <input type="text" id="sp-title" placeholder="ชื่อบิล (เช่น ชาบู, ค่าที่พัก)" required class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm" />
+        <input type="number" step="0.01" id="sp-total" placeholder="ยอดรวมทั้งหมด (บาท)" required class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm" />
+        <div>
+          <label class="text-xs text-slate-400">รายชื่อเพื่อนที่ร่วมหาร (คั่นด้วยเครื่องหมายจุลภาค , )</label>
+          <input type="text" id="sp-members" placeholder="เช่น นนท์, เมย์, บอส (ไม่ต้องใส่ชื่อเรา)" required class="w-full mt-1 px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm" />
+          <p class="text-[11px] text-emerald-500 mt-1">*ระบบจะหารเท่ากันรวมตัวคุณด้วยอัตโนมัติ</p>
+        </div>
+        <button type="submit" class="w-full py-3 rounded-xl bg-emerald-500 text-white font-semibold">สร้างรายการหาร</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: ตั้งเป้าหมายการออม -->
+  <div id="modal-goal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center p-4">
+    <div class="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 space-y-4">
+      <div class="flex justify-between items-center">
+        <h3 class="font-bold text-lg">ตั้งเป้าหมายการออม</h3>
+        <button onclick="closeModal('modal-goal')" class="text-slate-400 text-xl">&times;</button>
+      </div>
+      <form onsubmit="handleAddGoal(event)" class="space-y-3">
+        <input type="text" id="g-title" placeholder="เป้าหมาย (เช่น เงินสำรองฉุกเฉิน, เที่ยวญี่ปุ่น)" required class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm" />
+        <input type="number" id="g-target" placeholder="จำนวนเงินเป้าหมาย (บาท)" required class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm" />
+        <input type="date" id="g-deadline" required class="w-full px-3 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-sm" />
+        <button type="submit" class="w-full py-3 rounded-xl bg-emerald-500 text-white font-semibold">บันทึกเป้าหมาย</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
